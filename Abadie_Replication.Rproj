@@ -2,7 +2,9 @@
 title: "Second Replication"
 author: "Ben Carlton"
 date: "4/16/2021"
-output: html_document
+output:
+  pdf_document: default
+  html_document: default
 ---
  
 ```{r setup, include=FALSE}
@@ -29,7 +31,9 @@ detail2 <- Abadie$u74*Abadie$hisp
 age1 <- Abadie$age + agesq + agecube
 educ1 <-Abadie$educ + educsq + educcube
 ```
+#1
 
+## A
 
 ```{r}
 ### Logit Model
@@ -37,8 +41,24 @@ logit <- glm(treat ~ age + agesq + agecube + educ + educsq + educcube +
                    marr + nodegree + black + hisp + re74 + re75 + u74 +
                    u75 + detail1, family = binomial(link = "logit"), 
                  data = Abadie)
-summary(logit)
 
+OLS <- lm(treat ~ age + agesq + educ + educsq + 
+                   marr + nodegree + black + hisp + re74 + re75 + u74 +
+                   u75 + detail1, 
+                 data = Abadie)
+```
+
+
+```{r pressure, echo=FALSE}
+stargazer(OLS, logit,
+  title="OLS",
+  notes.label="Significance Levels",
+  type = "text"
+  )
+```
+
+## B
+```{r}
 Abadielogitscore <- Abadie %>% 
   mutate(pscore = logit$fitted.values)
 
@@ -47,32 +67,130 @@ pcontrol1 <- Abadielogitscore %>%
   pull(pscore) %>% 
   mean()
 
+ptreated1 <- Abadielogitscore %>% 
+  filter(treat == 1) %>% 
+  pull(pscore) %>% 
+  mean()
+
+AbadieOLSscore <- Abadie %>% 
+  mutate(pscore = OLS$fitted.values)
+
+pcontrol2 <- AbadieOLSscore %>% 
+  filter(treat == 0) %>% 
+  pull(pscore) %>% 
+  mean()
+
+ptreated2 <- AbadieOLSscore %>% 
+  filter(treat == 1) %>% 
+  pull(pscore) %>% 
+  mean()
+```
+
+## C
+
+Distribution of pscores: Logit for Treatment = 0
+```{r hist1, echo=FALSE}
 Abadielogitscore %>% 
   filter(treat == 0) %>% 
   ggplot() +
   geom_histogram(aes(x = pscore))
 ```
 
-
-```{r}
-ptreated1 <- Abadielogitscore %>% 
-  filter(treat == 1) %>% 
-  pull(pscore) %>% 
-  mean()
-
+Distribution of pscores: Logit for Treatment = 1
+```{r hist2, echo=FALSE}
 Abadielogitscore %>% 
   filter(treat == 1) %>% 
   ggplot() +
   geom_histogram(aes(x = pscore))
 ```
 
+Max and Min for Logit pscores
+```{r table1, echo=FALSE}
+Abadielogitscore %>%
+  group_by(treat) %>%
+  summarize(Max = round(max(pscore),4), Min = round(min(pscore),4)) %>%
+  mutate(treat = if_else(treat == 0, "Control", "Treatment"))
+```
 
-```{r}
-Abadielogitscore <- Abadielogitscore %>% 
-  
-  filter(!(pscore >= 0.9)) %>% 
-  filter(!(pscore <= 0.1))
+Distribution of pscores: OLS for "Treament = 0"
+```{r hist3, echo=FALSE}
+AbadieOLSscore %>% 
+  filter(treat == 0) %>% 
+  ggplot() +
+  geom_histogram(aes(x = pscore))
+```
 
+Distribution of pscores: OLS for "Treatment = 1"
+```{r hist4, echo=FALSE}
+AbadieOLSscore %>% 
+  filter(treat == 1) %>% 
+  ggplot() +
+  geom_histogram(aes(x = pscore))
+```
+
+Max and Min for OLS pscores
+```{r table2, echo=FALSE}
+AbadieOLSscore %>%
+  group_by(treat) %>%
+  summarize(Max = round(max(pscore),4), Min = round(min(pscore),4)) %>%
+  mutate(treat = if_else(treat == 0, "Control", "Treatment"))
+```
+
+## D
+
+Max and Min pscores for filtered Logit
+```{r table3, echo=FALSE}
+Abadielogitscore %>% filter(between(pscore, 0.1, 0.9)) %>%
+  group_by(treat) %>%
+  summarize(Max = round(max(pscore),4), Min = round(min(pscore),4)) %>%
+  mutate(treat = if_else(treat == 0, "Control", "Treatment"))
+```
+
+Filtered Logit pscore distribution for "Treament = 0"
+```{r hist5, echo=FALSE}
+Abadielogitscore %>% filter(between(pscore, 0.1, 0.9)) %>%
+  filter(treat == 0) %>% 
+  ggplot() +
+  geom_histogram(aes(x = pscore))
+```
+
+Filtered Logit pscore distribution for "Treament = 1"
+```{r hist6, echo=FALSE}
+Abadielogitscore %>% filter(between(pscore, 0.1, 0.9)) %>%
+  filter(treat == 1) %>% 
+  ggplot() +
+  geom_histogram(aes(x = pscore))
+```
+
+Max and Min pscores for filtered OLS
+```{r table4, echo=FALSE}
+AbadieOLSscore %>% filter(between(pscore, 0.1, 0.9)) %>%
+  group_by(treat) %>%
+  summarize(Max = round(max(pscore),4), Min = round(min(pscore),4)) %>%
+  mutate(treat = if_else(treat == 0, "Control", "Treatment"))
+
+```
+
+Filtered OLS pscore distribution for "Treament = 0"
+```{r hist7, echo=FALSE}
+AbadieOLSscore %>% filter(between(pscore, 0.1, 0.9)) %>%
+  filter(treat == 0) %>% 
+  ggplot() +
+  geom_histogram(aes(x = pscore))
+```
+
+Filtered Logit pscore distribution for "Treament = 1"
+```{r hist8, echo=FALSE}
+AbadieOLSscore %>% filter(between(pscore, 0.1, 0.9)) %>%
+  filter(treat == 1) %>% 
+  ggplot() +
+  geom_histogram(aes(x = pscore))
+```
+
+#2
+
+Looking at the difference in real earnings the between treatment and control groups using the Logit model on the unfiltered dataset:
+```{r setup1, include=FALSE}
 mean1 <- Abadielogitscore %>% 
   filter(treat == 1) %>% 
   pull(re78) %>% 
@@ -87,55 +205,14 @@ mean0 <- Abadielogitscore %>%
 
 Abadie$y0 <- mean0
 
-ate1 <- unique(Abadie$y1 - Abadie$y0)
-
-summary(ate1)
+logitdifference_untreated <- unique(Abadie$y1 - Abadie$y0)
+```
+```{r}
+summary(logitdifference_untreated)
 ```
 
-
-```{r}
-### OLS
-
-OLS <- lm(treat ~ age + agesq + educ + educsq + 
-                   marr + nodegree + black + hisp + re74 + re75 + u74 +
-                   u75, 
-                 data = Abadie)
-
-stargazer(OLS, logit,
-  title="OLS",
-  notes.label="Significance Levels",
-  type = "text"
-  )
-
-AbadieOLSscore <- Abadie %>% 
-  mutate(pscore = OLS$fitted.values)
-
-pcontrol2 <- AbadieOLSscore %>% 
-  filter(treat == 0) %>% 
-  pull(pscore) %>% 
-  mean()
-
-AbadieOLSscore %>% 
-  filter(treat == 0) %>% 
-  ggplot() +
-  geom_histogram(aes(x = pscore))
-```
-
-
-```{r}
-ptreated2 <- AbadieOLSscore %>% 
-  filter(treat == 1) %>% 
-  pull(pscore) %>% 
-  mean()
-
-AbadieOLSscore %>% 
-  filter(treat == 1) %>% 
-  ggplot() +
-  geom_histogram(aes(x = pscore))
-```
-
-
-```{r}
+When doing the same for the OLS model:
+```{r setup3, include=FALSE}
 meana <- AbadieOLSscore %>% 
   filter(treat == 1) %>% 
   pull(re78) %>% 
@@ -150,15 +227,19 @@ meanb <- AbadieOLSscore %>%
 
 Abadie$y0 <- meanb
 
-ate2 <- unique(Abadie$y1 - Abadie$y0)
-
-summary(ate2)
+OLSdifference_untreated <- unique(Abadie$y1 - Abadie$y0)
+```
+```{r}
+summary(OLSdifference_untreated)
 ```
 
+# 3
+
+Using the weighted
 
 ```{r}
 N <- nrow(Abadielogitscore)
-#- Manual with non-normalized weights using all data
+
 Abadielogitscore <- Abadielogitscore %>% 
   mutate(d1 = treat/pscore,
          d0 = (1-treat)/(1-pscore))
@@ -200,10 +281,6 @@ Abadielogitscore <- Abadielogitscore %>%
   filter(!(pscore >= 0.9)) %>% 
   filter(!(pscore <= 0.1))
 
-AbadieOLSscore %>% 
-  filter(treat == 0) %>% 
-  ggplot() +
-  geom_histogram(aes(x = pscore))
 
 N <- nrow(Abadielogitscore)
 #- Manual with non-normalized weights using all data
@@ -252,14 +329,8 @@ ate3 <- unique(Abadie$y1 - Abadie$y0)
 
 summary(ate3)
 
-
-
 ```
   
 
-
-```{r pressure, echo=FALSE}
-plot(pressure)
-```
 
 Note that the `echo = FALSE` parameter was added to the code chunk to prevent printing of the R code that generated the plot.
