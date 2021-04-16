@@ -36,8 +36,12 @@ educ1 <-Abadie$educ + educsq + educcube
 ## A
 
 ```{r}
-### Logit Model
+
 logit <- glm(treat ~ age + agesq + agecube + educ + educsq + educcube +
+                   marr + nodegree + black + hisp + re74 + re75 + u74 +
+                   u75 + detail1, family = binomial(link = "logit"), 
+                 data = Abadie)
+logit0 <- logit <- glm(treat ~ age + agesq + agecube + educ + educsq + educcube +
                    marr + nodegree + black + hisp + re74 + re75 + u74 +
                    u75 + detail1, family = binomial(link = "logit"), 
                  data = Abadie)
@@ -51,7 +55,7 @@ OLS <- lm(treat ~ age + agesq + educ + educsq +
 
 ```{r pressure, echo=FALSE}
 stargazer(OLS, logit,
-  title="OLS",
+  title="Probability Models",
   notes.label="Significance Levels",
   type = "text"
   )
@@ -84,6 +88,9 @@ ptreated2 <- AbadieOLSscore %>%
   filter(treat == 1) %>% 
   pull(pscore) %>% 
   mean()
+
+Abadielogit0score <- Abadie %>% 
+  mutate(pscore = logit0$fitted.values)
 ```
 
 ## C
@@ -95,6 +102,8 @@ Abadielogitscore %>%
   ggplot() +
   geom_histogram(aes(x = pscore))
 ```
+While the values do range from 0 to 1 there is a heavy skew to the left.
+
 
 Distribution of pscores: Logit for Treatment = 1
 ```{r hist2, echo=FALSE}
@@ -103,6 +112,7 @@ Abadielogitscore %>%
   ggplot() +
   geom_histogram(aes(x = pscore))
 ```
+Looking at the results, they do go from 0 to 1, and while it appears that if the histogram were restricted to 4 rectangles we would see something ideal, there is only somewhat of a nice distribution.
 
 Max and Min for Logit pscores
 ```{r table1, echo=FALSE}
@@ -119,6 +129,7 @@ AbadieOLSscore %>%
   ggplot() +
   geom_histogram(aes(x = pscore))
 ```
+Seeing the negative probabilities of this distribution is concerning but not surprising, given what we know about LPM models.
 
 Distribution of pscores: OLS for "Treatment = 1"
 ```{r hist4, echo=FALSE}
@@ -127,6 +138,8 @@ AbadieOLSscore %>%
   ggplot() +
   geom_histogram(aes(x = pscore))
 ```
+The sheer number of small treatment = 0 pscores is clearly causing an issue when trying to estimate re78 with the OLS model.
+
 
 Max and Min for OLS pscores
 ```{r table2, echo=FALSE}
@@ -191,14 +204,14 @@ AbadieOLSscore %>% filter(between(pscore, 0.1, 0.9)) %>%
 
 Looking at the difference in real earnings the between treatment and control groups using the Logit model on the unfiltered dataset:
 ```{r setup1, include=FALSE}
-mean1 <- Abadielogitscore %>% 
+mean1 <- Abadielogit0score %>% 
   filter(treat == 1) %>% 
   pull(re78) %>% 
   mean()
 
 Abadie$y1 <- mean1
 
-mean0 <- Abadielogitscore %>% 
+mean0 <- Abadielogit0score %>% 
   filter(treat == 0) %>% 
   pull(re78) %>% 
   mean()
@@ -210,6 +223,8 @@ logitdifference_untreated <- unique(Abadie$y1 - Abadie$y0)
 ```{r}
 summary(logitdifference_untreated)
 ```
+The -$8,498 result is similair but not the same to the one found in the Mixtape, but the direction and relative magnitude is somewhat reassuring (the inferencential aspects not so much).
+
 
 When doing the same for the OLS model:
 ```{r setup3, include=FALSE}
@@ -232,58 +247,39 @@ OLSdifference_untreated <- unique(Abadie$y1 - Abadie$y0)
 ```{r}
 summary(OLSdifference_untreated)
 ```
+When doing this for the OLS model I get the same result, which is massively negative and cannot be correct. The idea of training having a substaintial negative effect on real earnings in later periods would imply that people are less employable or demoted after receiving training. 
 
 # 3
 
-Using the weighted
+Using the non-weighted normalized model from Chapter 5 in The Mixtape:
 
+```{r form1, echo=FALSE}
+N <- nrow(Abadielogit0score)
+
+Abadielogit0score <- Abadielogit0score %>% 
+  mutate(d1 = treat/pscore,
+         d0 = (1-treat)/(1-pscore))
+
+s1 <- sum(Abadielogit0score$d1)
+s0 <- sum(Abadielogit0score$d0)
+
+
+Abadielogit0score <- Abadielogit0score %>% 
+  mutate(y1 = treat * re78/pscore,
+         y0 = (1-treat) * re78/(1-pscore),
+         ht = y1 - y0)
+
+non_norm <- Abadielogit0score %>% 
+  pull(ht) %>% 
+  mean()
+```
 ```{r}
+summary(non_norm)
+```
+With the data not being weighted or trimmed, the result is similair to that found in the Mixtape and is still concerning with its implications. Utilizing the expectations formula for weighting and trying again: 
+
+```{r form2, echo=FALSE}
 N <- nrow(Abadielogitscore)
-
-Abadielogitscore <- Abadielogitscore %>% 
-  mutate(d1 = treat/pscore,
-         d0 = (1-treat)/(1-pscore))
-
-s1 <- sum(Abadielogitscore$d1)
-s0 <- sum(Abadielogitscore$d0)
-
-
-Abadielogitscore <- Abadielogitscore %>% 
-  mutate(y1 = treat * re78/pscore,
-         y0 = (1-treat) * re78/(1-pscore),
-         ht = y1 - y0)
-
-Abadielogitscore %>% 
-  pull(ht) %>% 
-  mean()
-
-
-#- Manual with normalized weights
-Abadielogitscore <- Abadielogitscore %>% 
-  mutate(y1 = (treat*re78/pscore)/(s1/N),
-         y0 = ((1-treat)*re78/(1-pscore))/(s0/N),
-         norm = y1 - y0)
-Abadielogitscore <- Abadielogitscore %>% 
-  mutate(y1 = treat * re78/pscore,
-         y0 = (1-treat) * re78/(1-pscore),
-         ht = y1 - y0)
-
-Abadielogitscore %>% 
-  pull(ht) %>% 
-  mean()
-
-Abadielogitscore %>% 
-  pull(norm) %>% 
-  mean()
-
-Abadielogitscore <- Abadielogitscore %>% 
-  select(-d1, -d0, -y1, -y0, -ht, -norm) %>% 
-  filter(!(pscore >= 0.9)) %>% 
-  filter(!(pscore <= 0.1))
-
-
-N <- nrow(Abadielogitscore)
-#- Manual with non-normalized weights using all data
 Abadielogitscore <- Abadielogitscore %>% 
   mutate(d1 = treat/pscore,
          d0 = (1-treat)/(1-pscore))
@@ -311,26 +307,24 @@ Abadielogitscore %>%
   pull(norm) %>% 
   mean()
 
-mean1 <- Abadielogitscore %>% 
+mean2 <- Abadielogitscore %>% 
   filter(treat == 1) %>% 
   pull(re78) %>% 
   mean()
 
-Abadie$y1 <- mean1
+Abadie$y1 <- mean2
 
-mean0 <- Abadielogitscore %>% 
+mean3 <- Abadielogitscore %>% 
   filter(treat == 0) %>% 
   pull(re78) %>% 
   mean()
 
-Abadie$y0 <- mean0
+Abadie$y0 <- mean3
 
-ate3 <- unique(Abadie$y1 - Abadie$y0)
-
-summary(ate3)
-
+weighted_result <- unique(Abadie$y1 - Abadie$y0)
 ```
-  
 
-
-Note that the `echo = FALSE` parameter was added to the code chunk to prevent printing of the R code that generated the plot.
+```{r}
+summary(weighted_result)
+```
+While this not the exact figure that I was hoping to get, it is similar to the one found in the mixtape and does make sense logically when looking at the causal effect of training on real earnings in 1978.   
