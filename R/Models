@@ -1,1 +1,7 @@
+Original R code for the models used in this project were provided by the great Dr. Scott Cunningham and can be found in the following links:
 
+https://github.com/scunning1975/causal-inference-class/blob/master/Master_do_files/nsw_experimental.R
+
+https://github.com/scunning1975/causal-inference-class/blob/master/Master_do_files/nsw_pscore.R
+
+https://github.com/scunning1975/causal-inference-class/blob/master/Master_do_files/ipw.R
