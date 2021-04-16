@@ -13,6 +13,7 @@ library(tidyverse)
 library(haven)
 library(stargazer)
 library(ggplot2)
+library(ggpubr)
 
 
 Abadie <- read.csv("https://raw.githubusercontent.com/benjcarlton/Replication_2/main/Data/rep2_master.csv")
@@ -41,7 +42,7 @@ logit <- glm(treat ~ age + agesq + agecube + educ + educsq + educcube +
                    marr + nodegree + black + hisp + re74 + re75 + u74 +
                    u75 + detail1, family = binomial(link = "logit"), 
                  data = Abadie)
-logit0 <- logit <- glm(treat ~ age + agesq + agecube + educ + educsq + educcube +
+logit0 <- glm(treat ~ age + agesq + agecube + educ + educsq + educcube +
                    marr + nodegree + black + hisp + re74 + re75 + u74 +
                    u75 + detail1, family = binomial(link = "logit"), 
                  data = Abadie)
@@ -102,7 +103,7 @@ Abadielogitscore %>%
   ggplot() +
   geom_histogram(aes(x = pscore))
 ```
-While the values do range from 0 to 1 there is a heavy skew to the left.
+While the values do range from 0 to 1 there is a heavy skew to the left that must addressed so it does not heavily "blow up" the results.
 
 
 Distribution of pscores: Logit for Treatment = 1
@@ -166,6 +167,8 @@ Abadielogitscore %>% filter(between(pscore, 0.1, 0.9)) %>%
   ggplot() +
   geom_histogram(aes(x = pscore))
 ```
+The left skew has been eliminated and it appears as though the region directly to the right of it has been zoomed in and is much closer to being comparable to the treatment = 1 distribution.
+
 
 Filtered Logit pscore distribution for "Treament = 1"
 ```{r hist6, echo=FALSE}
@@ -191,6 +194,8 @@ AbadieOLSscore %>% filter(between(pscore, 0.1, 0.9)) %>%
   ggplot() +
   geom_histogram(aes(x = pscore))
 ```
+While the negative values are gone, the maximum of roughly .2 is still concerning.
+
 
 Filtered Logit pscore distribution for "Treament = 1"
 ```{r hist8, echo=FALSE}
@@ -199,6 +204,7 @@ AbadieOLSscore %>% filter(between(pscore, 0.1, 0.9)) %>%
   ggplot() +
   geom_histogram(aes(x = pscore))
 ```
+Fortunately, there is now sufficient overlap between the two distributions.
 
 #2
 
@@ -221,7 +227,7 @@ Abadie$y0 <- mean0
 logitdifference_untreated <- unique(Abadie$y1 - Abadie$y0)
 ```
 ```{r}
-summary(logitdifference_untreated)
+print(logitdifference_untreated)
 ```
 The -$8,498 result is similair but not the same to the one found in the Mixtape, but the direction and relative magnitude is somewhat reassuring (the inferencential aspects not so much).
 
@@ -245,7 +251,7 @@ Abadie$y0 <- meanb
 OLSdifference_untreated <- unique(Abadie$y1 - Abadie$y0)
 ```
 ```{r}
-summary(OLSdifference_untreated)
+print(OLSdifference_untreated)
 ```
 When doing this for the OLS model I get the same result, which is massively negative and cannot be correct. The idea of training having a substaintial negative effect on real earnings in later periods would imply that people are less employable or demoted after receiving training. 
 
@@ -274,12 +280,18 @@ non_norm <- Abadielogit0score %>%
   mean()
 ```
 ```{r}
-summary(non_norm)
+print(non_norm)
 ```
 With the data not being weighted or trimmed, the result is similair to that found in the Mixtape and is still concerning with its implications. Utilizing the expectations formula for weighting and trying again: 
 
 ```{r form2, echo=FALSE}
+
+Abadielogitscore <- Abadielogitscore %>%
+  filter(!(pscore >= 0.9)) %>% 
+  filter(!(pscore <= 0.1))
+
 N <- nrow(Abadielogitscore)
+
 Abadielogitscore <- Abadielogitscore %>% 
   mutate(d1 = treat/pscore,
          d0 = (1-treat)/(1-pscore))
@@ -321,10 +333,6 @@ mean3 <- Abadielogitscore %>%
 
 Abadie$y0 <- mean3
 
-weighted_result <- unique(Abadie$y1 - Abadie$y0)
 ```
 
-```{r}
-summary(weighted_result)
-```
-While this not the exact figure that I was hoping to get, it is similar to the one found in the mixtape and does make sense logically when looking at the causal effect of training on real earnings in 1978.   
+While this not the exact figure that I was hoping to get, it is similar to the one found in the Mixtape and does make sense logically when looking at the causal effect of training on real earnings in 1978. My higher estimate is roughly 14 higher than the Mixtape result, while my lower estimate is roughly 16.50 lower. I am not sure why the number is not exact, but going through these steps has been eye opening on how the process of collecting, sorting, and cleaning data does not stop when the "master" dataset is uploaded.   
