@@ -1,13 +1,265 @@
-Version: 1.0
+---
+title: "Second Replication"
+author: "Ben Carlton"
+date: "4/16/2021"
+output: html_document
+---
+ 
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(tidyverse)
+library(haven)
+library(stargazer)
+library(ggplot2)
 
-RestoreWorkspace: Default
-SaveWorkspace: Default
-AlwaysSaveHistory: Default
 
-EnableCodeIndexing: Yes
-UseSpacesForTab: Yes
-NumSpacesForTab: 2
-Encoding: UTF-8
+Abadie <- read.csv("https://raw.githubusercontent.com/benjcarlton/Replication_2/main/Data/rep2_master.csv")
 
-RnwWeave: Sweave
-LaTeX: pdfLaTeX
+agesq <- Abadie$age^2
+agecube <- Abadie$age^3
+educsq <- Abadie$educ*Abadie$educ
+educcube <- Abadie$educ*Abadie$educ*Abadie$educ
+u74 = case_when(Abadie$re74 == 0 ~ 1, TRUE ~ 0)
+u75 = case_when(Abadie$re75 == 0 ~ 1, TRUE ~ 0)
+detail1 <- Abadie$educ*Abadie$re74
+re74sq <- Abadie$re74^2
+re75sq <- Abadie$re75^2
+detail2 <- Abadie$u74*Abadie$hisp
+
+age1 <- Abadie$age + agesq + agecube
+educ1 <-Abadie$educ + educsq + educcube
+```
+
+
+```{r}
+### Logit Model
+logit <- glm(treat ~ age + agesq + agecube + educ + educsq + educcube +
+                   marr + nodegree + black + hisp + re74 + re75 + u74 +
+                   u75 + detail1, family = binomial(link = "logit"), 
+                 data = Abadie)
+summary(logit)
+
+Abadielogitscore <- Abadie %>% 
+  mutate(pscore = logit$fitted.values)
+
+pcontrol1 <- Abadielogitscore %>% 
+  filter(treat == 0) %>% 
+  pull(pscore) %>% 
+  mean()
+
+Abadielogitscore %>% 
+  filter(treat == 0) %>% 
+  ggplot() +
+  geom_histogram(aes(x = pscore))
+```
+
+
+```{r}
+ptreated1 <- Abadielogitscore %>% 
+  filter(treat == 1) %>% 
+  pull(pscore) %>% 
+  mean()
+
+Abadielogitscore %>% 
+  filter(treat == 1) %>% 
+  ggplot() +
+  geom_histogram(aes(x = pscore))
+```
+
+
+```{r}
+Abadielogitscore <- Abadielogitscore %>% 
+  
+  filter(!(pscore >= 0.9)) %>% 
+  filter(!(pscore <= 0.1))
+
+mean1 <- Abadielogitscore %>% 
+  filter(treat == 1) %>% 
+  pull(re78) %>% 
+  mean()
+
+Abadie$y1 <- mean1
+
+mean0 <- Abadielogitscore %>% 
+  filter(treat == 0) %>% 
+  pull(re78) %>% 
+  mean()
+
+Abadie$y0 <- mean0
+
+ate1 <- unique(Abadie$y1 - Abadie$y0)
+
+summary(ate1)
+```
+
+
+```{r}
+### OLS
+
+OLS <- lm(treat ~ age + agesq + educ + educsq + 
+                   marr + nodegree + black + hisp + re74 + re75 + u74 +
+                   u75, 
+                 data = Abadie)
+
+stargazer(OLS, logit,
+  title="OLS",
+  notes.label="Significance Levels",
+  type = "text"
+  )
+
+AbadieOLSscore <- Abadie %>% 
+  mutate(pscore = OLS$fitted.values)
+
+pcontrol2 <- AbadieOLSscore %>% 
+  filter(treat == 0) %>% 
+  pull(pscore) %>% 
+  mean()
+
+AbadieOLSscore %>% 
+  filter(treat == 0) %>% 
+  ggplot() +
+  geom_histogram(aes(x = pscore))
+```
+
+
+```{r}
+ptreated2 <- AbadieOLSscore %>% 
+  filter(treat == 1) %>% 
+  pull(pscore) %>% 
+  mean()
+
+AbadieOLSscore %>% 
+  filter(treat == 1) %>% 
+  ggplot() +
+  geom_histogram(aes(x = pscore))
+```
+
+
+```{r}
+meana <- AbadieOLSscore %>% 
+  filter(treat == 1) %>% 
+  pull(re78) %>% 
+  mean()
+
+Abadie$y1 <- meana
+
+meanb <- AbadieOLSscore %>% 
+  filter(treat == 0) %>% 
+  pull(re78) %>% 
+  mean()
+
+Abadie$y0 <- meanb
+
+ate2 <- unique(Abadie$y1 - Abadie$y0)
+
+summary(ate2)
+```
+
+
+```{r}
+N <- nrow(Abadielogitscore)
+#- Manual with non-normalized weights using all data
+Abadielogitscore <- Abadielogitscore %>% 
+  mutate(d1 = treat/pscore,
+         d0 = (1-treat)/(1-pscore))
+
+s1 <- sum(Abadielogitscore$d1)
+s0 <- sum(Abadielogitscore$d0)
+
+
+Abadielogitscore <- Abadielogitscore %>% 
+  mutate(y1 = treat * re78/pscore,
+         y0 = (1-treat) * re78/(1-pscore),
+         ht = y1 - y0)
+
+Abadielogitscore %>% 
+  pull(ht) %>% 
+  mean()
+
+
+#- Manual with normalized weights
+Abadielogitscore <- Abadielogitscore %>% 
+  mutate(y1 = (treat*re78/pscore)/(s1/N),
+         y0 = ((1-treat)*re78/(1-pscore))/(s0/N),
+         norm = y1 - y0)
+Abadielogitscore <- Abadielogitscore %>% 
+  mutate(y1 = treat * re78/pscore,
+         y0 = (1-treat) * re78/(1-pscore),
+         ht = y1 - y0)
+
+Abadielogitscore %>% 
+  pull(ht) %>% 
+  mean()
+
+Abadielogitscore %>% 
+  pull(norm) %>% 
+  mean()
+
+Abadielogitscore <- Abadielogitscore %>% 
+  select(-d1, -d0, -y1, -y0, -ht, -norm) %>% 
+  filter(!(pscore >= 0.9)) %>% 
+  filter(!(pscore <= 0.1))
+
+AbadieOLSscore %>% 
+  filter(treat == 0) %>% 
+  ggplot() +
+  geom_histogram(aes(x = pscore))
+
+N <- nrow(Abadielogitscore)
+#- Manual with non-normalized weights using all data
+Abadielogitscore <- Abadielogitscore %>% 
+  mutate(d1 = treat/pscore,
+         d0 = (1-treat)/(1-pscore))
+
+s1 <- sum(Abadielogitscore$d1)
+s0 <- sum(Abadielogitscore$d0)
+
+
+Abadielogitscore <- Abadielogitscore %>% 
+  mutate(y1 = treat * re78/pscore,
+         y0 = (1-treat) * re78/(1-pscore),
+         ht = y1 - y0)
+
+Abadielogitscore <- Abadielogitscore %>% 
+  mutate(y1 = (treat*re78/pscore)/(s1/N),
+         y0 = ((1-treat)*re78/(1-pscore))/(s0/N),
+         norm = y1 - y0)
+
+
+Abadielogitscore %>% 
+  pull(ht) %>% 
+  mean()
+
+Abadielogitscore %>% 
+  pull(norm) %>% 
+  mean()
+
+mean1 <- Abadielogitscore %>% 
+  filter(treat == 1) %>% 
+  pull(re78) %>% 
+  mean()
+
+Abadie$y1 <- mean1
+
+mean0 <- Abadielogitscore %>% 
+  filter(treat == 0) %>% 
+  pull(re78) %>% 
+  mean()
+
+Abadie$y0 <- mean0
+
+ate3 <- unique(Abadie$y1 - Abadie$y0)
+
+summary(ate3)
+
+
+
+```
+  
+
+
+```{r pressure, echo=FALSE}
+plot(pressure)
+```
+
+Note that the `echo = FALSE` parameter was added to the code chunk to prevent printing of the R code that generated the plot.
