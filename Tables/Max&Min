@@ -1,0 +1,6 @@
+```{r table1, echo=FALSE}
+Abadielogitscore %>%
+  group_by(treat) %>%
+  summarize(Max = round(max(pscore),4), Min = round(min(pscore),4)) %>%
+  mutate(treat = if_else(treat == 0, "Control", "Treatment"))
+```
