@@ -1,1 +1,6 @@
+Histogram:
 
+Abadielogitscore %>% 
+  filter(treat == 1) %>% 
+  ggplot() +
+  geom_histogram(aes(x = pscore))
