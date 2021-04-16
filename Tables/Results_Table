@@ -1,0 +1,9 @@
+Simple Table:
+
+```{r pressure, echo=FALSE}
+stargazer(OLS, logit,
+  title="Probability Models",
+  notes.label="Significance Levels",
+  type = "text"
+  )
+```
